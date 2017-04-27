@@ -1,164 +1,238 @@
+#!/usr/bin/env python
 from datetime import datetime
 
 from flask import Flask, jsonify, make_response, request
 from flask_restful import Resource, Api, abort, reqparse
+from flask_httpauth import HTTPBasicAuth    
 
-# https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask
-# https://flask-restful.readthedocs.io/en/0.3.5/quickstart.html
-# https://blog.miguelgrinberg.com/post/restful-authentication-with-flask
+import models
+
+# Auth
+
+auth = HTTPBasicAuth()
+
+users_by_username = {user["username"]: user for user in models.users.values()}
+
+@auth.get_password
+def get_password(username):
+    user = users_by_username.get(username)
+    return (user["password"] if user else None)
+
+@auth.error_handler
+def unauthorized():
+    return make_response(jsonify({'error': 'Unauthorized access'}), 401)
+
+def get_current_user():
+    auth_username = auth.username()
+    return next(user for user in models.users.values() if user["username"] == auth_username)
+
+# Init flask app
 
 app = Flask(__name__)
-app.config['ERROR_404_HELP'] = False
 api = Api(app)
+app.config['ERROR_404_HELP'] = False
 
-users = {
-    "1": {
-        "id": "1",
-        "name": "Joel Fleischman",
-        "username": "joel",
-        "address": "Flushing, Queens (New York City)",
-        "admin": True,
-        "gender": "male",
-        "avatarUrl" : "http://24.media.tumblr.com/tumblr_lrt2nf1G7Y1qh4q2fo4_500.png",
-        "email": "joel.fleischman@mail.com",
-        "state": "active",
-        "phoneNumber": "123-123-001",
-        "created": datetime(2016, 4, 20),
-        "lastAccess": datetime(2016, 4, 24),
-        "serverHost": "http://pbx.com/provision",
-        "password_hash": "1234",
-    },
-    "2": {
-        "id": "2",
-        "name": "Maggie O'Connell",
-        "username": "maggie",
-        "address": "Cicely, Alaska",
-        "admin": True,
-        "gender": "female",
-        "avatarUrl" : "https://s-media-cache-ak0.pinimg.com/736x/ab/e9/33/abe93316032b2eb1c0f0a28d0761247d.jpg",
-        "email": "maggie.oconnell@mail.com",
-        "state": "pending",
-        "phoneNumber": "123-123-002",
-        "created": datetime(2016, 5, 10),
-        "lastAccess": datetime(2016, 5, 14),
-        "serverHost": "http://pbx.com/provision",
-        "password_hash": "1234",
-    },
-    "3": {
-        "id": "3",
-        "name": "Marilyn Whirlwind",
-        "username": "marilyn",
-        "address": "Cicely, Alaska",
-        "admin": False,
-        "gender": "female",
-        "avatarUrl" : "http://www.moosechick.com/Marilyn-totem.JPG",
-        "email": "marilyn.whildwind@mail.com",
-        "state": "active",
-        "phoneNumber": "123-123-003",
-        "created": datetime(2014, 1, 2),
-        "lastAccess": datetime(2016, 7, 26),
-        "serverHost": "http://pbx.com/provision",
-        "password_hash": "1234",
-    },
-}
+@app.errorhandler(404)
+def page_not_found(e):
+    return jsonify(error=404, text="The requested URL was not found on the server"), 404
 
-messages = {
-    "1": {
-        "text": "Were you able to call?",
-        "from": users["1"],
-        "to": users["3"],
-        "sent": datetime(2016, 7, 26, 22, 10),
-    },
-    "2": {
-        "text": "Make sure you have credit before making a call",
-        "from": users["1"],
-        "to": users["3"],
-        "sent": datetime(2016, 7, 26, 22, 50),
-    },
-}
+# Data models
 
-vouchers = {
-    "1": {
-        "user": users["3"],
-        "state": "active",
-        "creditRemaining": 40,
-        "creditTotal": 50,
-        "code": "voucher50",
-        "url": "http://vouchers/50",
-        "bulkNumber": "bulk-50",
-        "Vendor": "EstPhonic",
-        "created": datetime(2016, 7, 26, 22, 50),
-        "activated": datetime(2016, 7, 26, 23, 50),
-        "assigned": datetime(2016, 7, 27, 20, 50),
-        "depleted": None,
-    },
-}
+# Helper functions
 
-notifications = {
-    "1": {
-        "type": "newUserAccepted",
-        "user": users["1"],
-    },
-    "2": {
-        "type": "newUserAccepted",
-        "admin": users["1"],
-        "user": users["3"],
-    },
-    "3": {
-        "type": "newUserRequest",
-        "admin": users["1"],
-        "user": users["2"],
-    },
-    "4": {
-        "type": "messageSent",
-        "message": messages["1"],
-    },
-    "5": {
-        "type": "profileUpdated",
-        "user": users["2"],
-    },
-    "6": {
-        "type": "toppedUp",
-        "voucher": vouchers["1"],
-    },
-}
+def first(it):
+    return next(it, None)
 
-def get_public_user(user, private_fields=["password_hash"]):
+def merge(d1, d2):
+    d3 = d1.copy()
+    d3.update(d2)
+    return d3
+
+def get_next_id(resources):
+    return (max(resource["id"] for resource in resources.values()) + 1 if resources else 1)
+
+def get_public_user(user, private_fields=["password"]):
     return {k: v for (k, v) in user.items() if k not in private_fields}
 
-parser = reqparse.RequestParser()
-parser.add_argument('user')
+def get_user(users, user_id):
+    if user_id not in models.users:
+        abort(404, message="User with id {} doesn't exist".format(user_id))
+    else:
+        return models.users[user_id]
+
+# Resources
+
+class NewUserRequestList(Resource):
+    def get(self):
+        return jsonify(list(models.new_user_requests.values()))
+
+    def post(self):
+        new_user = request.get_json().get("user")
+        username = new_user.get("username")
+        existing_usernames = (user["username"] for user in models.users.values())
+        pending_requested_usernames = (
+            req["user"]["username"]
+            for req in models.new_user_requests.values()
+            if req["state"] == "pending"
+        )
+
+        if not username:
+            abort(400, message="Missing field: username")
+        if username in existing_usernames:
+            abort(400, message="User {} already exist".format(username))
+        elif username in pending_requested_usernames:
+            abort(400, message="There is a request for user {} already pending".format(username))
+        else:
+            new_id = get_next_id(models.new_user_requests)
+            new_user_request = {
+                "id": new_id,
+                "user": new_user,
+                "created": datetime.now(),
+                "updated": datetime.now(),
+                "adminUser": None,
+                "state": "pending",
+            }
+            models.new_user_requests[new_id] = new_user_request
+            return jsonify(new_user_request)
+
+# parser = reqparse.RequestParser()
+# parser.add_argument('user')
 
 class UserList(Resource):
     def get(self):
-        return jsonify([get_public_user(user) for user in users.values()])
+        return jsonify([get_public_user(user) for user in models.users.values()])
 
 class User(Resource):
     def get(self, user_id):
-        if user_id not in users:
-            abort(404, message="User with id {} doesn't exist".format(user_id))
-        else:
-            return jsonify(get_public_user(users[user_id]))
+        user = get_user(models.users, user_id)
+        return jsonify(get_public_user(models.users[user_id]))
+
+    def delete(self, user_id):
+        user = get_user(models.users, user_id)
+        del models.users[user_id]
+        return jsonify({})
 
     def patch(self, user_id):
-        if user_id not in users:
-            abort(404, message="User with id {} doesn't exist".format(user_id))
-        else:
-            existing_user = users[user_id]
-            request_user = request.json
-            new_user = dict(existing_user, **request_user)
-            users[user_id] = new_user
-            return make_response(jsonify(new_user), 201)
+        user = get_user(models.users, user_id)
+        existing_user = models.users[user_id]
+        request_user = request.get_json()
+        new_user = dict(existing_user, **request_user)
+        models.users[user_id] = new_user
+        return jsonify(new_user)
 
 class NotificationList(Resource):
     def get(self):
-        return jsonify(list(notifications.values()))
+        return jsonify(list(models.notifications.values()))
 
+class NewUserRequestAcceptation(Resource):
+    def post(self, new_user_request_id):
+        new_user_request = models.new_user_requests[new_user_request_id]
+        if new_user_request["state"] == "pending":
+            new_user_request["state"] = "accepted"
+            return jsonify(dict(new_user_request=new_user_request))
+        else:
+            abort(400, message="newUserRequest {} is not pending".format(new_user_request_id))
 
-api.add_resource(UserList, '/users')
-api.add_resource(User, '/users/<string:user_id>')
+class NewUserRequestRejection(Resource):
+    def post(self, new_user_request_id):
+        new_user_request = models.new_user_requests[new_user_request_id]
+        if new_user_request["state"] == "pending":
+            new_user_request["state"] = "rejected"
+            return jsonify(dict(new_user_request=new_user_request))
+        else:
+            abort(400, message="newUserRequest {} is not pending".format(new_user_request_id))
+
+class MessageList(Resource):
+    def get(self, user_id):
+        user = get_user(models.users, user_id)
+        user_messages = [m for m in models.messages.values() if m["toUser"]["id"] == user_id]
+        return jsonify(user_messages)
+
+    @auth.login_required
+    def post(self, user_id):
+        user = get_user(models.users, user_id)
+        new_message_base = request.get_json()
+        new_message_id = get_next_id(models.messages)
+        #import ipdb; ipdb.set_trace()
+
+        new_message = merge(new_message_base, {
+            "id": new_message_id,
+            "fromUser": get_current_user(),
+            "toUser": user,
+            "created": datetime.now()
+        })
+        models.messages[new_message_id] = new_message
+        return jsonify(new_message)
+
+class CallPricing(Resource):
+    def get(self, number):
+        return models.call_pricing
+
+class UserVoucherList(Resource):
+    def get(self, user_id):
+        user = get_user(models.users, user_id)
+        user_vouchers = [v for v in models.vouchers.values() 
+            if v["user"] and v["user"]["id"] == user["id"]]
+        return jsonify(user_vouchers)
+
+    def post(self, user_id):
+        user = get_user(models.users, user_id)
+        code = request.get_json()["code"]
+        voucher = first(v for v in models.vouchers.values() 
+                if v["code"] == code and v["state"] == "inactive")
+        if not voucher:
+            abort(404, message="Voucher with code {} not found".format(code))
+        else:
+            activated_voucher = merge(voucher, {
+                "state": "active",
+                "activated": datetime.now(),
+                "user": user,
+            })
+            models.vouchers[voucher["id"]] = activated_voucher
+            return jsonify(activated_voucher)
+
+class Pricing(Resource):
+    def get(self):
+        return models.pricing
+
+    def patch(self):
+        new_pricing = request.get_json()
+        models.pricing.update(new_pricing)
+        return jsonify(pricing)
+
+# Routes
+
+## User not logged-in
+
+api.add_resource(NewUserRequestList, '/newUserRequests')
+
+## Admin
+
+### Notifications
 
 api.add_resource(NotificationList, '/notifications')
+
+api.add_resource(NewUserRequestAcceptation, '/newUserRequests/<int:new_user_request_id>/acceptation')
+api.add_resource(NewUserRequestRejection, '/newUserRequests/<int:new_user_request_id>/rejection')
+
+### Users
+
+api.add_resource(UserList, '/users')
+api.add_resource(User, '/users/<int:user_id>')
+api.add_resource(MessageList, '/users/<int:user_id>/messages')
+
+### Billing
+
+api.add_resource(Pricing, '/pricing')
+
+### WifiCall
+
+api.add_resource(CallPricing, '/callPricing/<string:number>')
+
+### Vouchers
+
+api.add_resource(UserVoucherList, '/users/<int:user_id>/vouchers')
+
 
 if __name__ == '__main__':
     app.run(debug=True)
