@@ -1,10 +1,8 @@
 from datetime import datetime
 
-def get_public_user(user, private_fields=["password"]):
+def user(user_id, private_fields=["password"]):
+    user = users[user_id]
     return {k: v for (k, v) in user.items() if k not in private_fields}
-
-def user(user_id):
-    return get_public_user(users[user_id])
 
 users = {
     1: {
@@ -32,7 +30,7 @@ users = {
         "gender": "female",
         "avatarUrl" : "https://s-media-cache-ak0.pinimg.com/736x/ab/e9/33/abe93316032b2eb1c0f0a28d0761247d.jpg",
         "email": "maggie.oconnell@mail.com",
-        "state": "pending",
+        "state": "active",
         "phoneNumber": "123-123-002",
         "created": datetime(2016, 5, 10),
         "lastAccess": datetime(2016, 5, 14),

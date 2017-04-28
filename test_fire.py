@@ -10,12 +10,12 @@ from flask import jsonify
 
 import fire
 
-
-
-class TestFlaskApi(unittest.TestCase):
+class TestFireApi(unittest.TestCase):
     Response = collections.namedtuple("Response", ["status", "body"])
+
     USERS = {
         "joel": {"username": "joel", "password": "joel1234"},
+        "marilyn": {"username": "marilyn", "password": "marilyn1234"},
     }
 
     def setUp(self):
@@ -25,19 +25,12 @@ class TestFlaskApi(unittest.TestCase):
     def request(self, method, path, data=None, user=None):
         app_method = method.lower()
         if data:
-            kwargs1 = {
-                "data": json.dumps(data), 
-                "content_type": 'application/json',
-            }
+            kwargs1 = {"data": json.dumps(data), "content_type": 'application/json'}
         else:
             kwargs1 = {}
         if user:
-            encoded_password = b64encode(bytes(user["username"] + ':' + user["password"], "utf-8")).decode("ascii")
-            kwargs2 = {
-                "headers": {
-                    'Authorization': 'Basic ' + encoded_password,
-                }
-            }        
+            encoded_password = b64encode(bytes(user["username"] + ':' + user["password"], "utf-8"))
+            kwargs2 = {"headers": {'Authorization': 'Basic ' + encoded_password.decode("ascii")}}
         else:
             kwargs2 = {}
         kwargs = dict(kwargs1, **kwargs2)
@@ -46,11 +39,29 @@ class TestFlaskApi(unittest.TestCase):
         body = json.loads(stream_response.get_data(stream_response))
         return self.Response(status, body)
 
-    def test_get_new_user_requests(self):
-        res = self.request("GET", '/newUserRequests')
+    ### Notifications
+
+    def test_get_notifications_as_admin(self):
+        res = self.request("GET", '/notifications', user=self.USERS["joel"])
+        self.assertEqual(res.status, 200)
+        notifications = res.body
+        self.assertEqual(len(notifications), 5)
+
+    ### New User Requests
+
+    def test_get_new_user_requests_as_admin(self):
+        res = self.request("GET", '/newUserRequests', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         new_user_requests = res.body
         self.assertEqual(len(new_user_requests), 2)
+
+    def test_get_new_user_requests_as_non_admin(self):
+        res = self.request("GET", '/newUserRequests', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 401)
+
+    def test_get_new_user_requests_unlogged(self):
+        res = self.request("GET", '/newUserRequests')
+        self.assertEqual(res.status, 401)
 
     def test_post_new_user_requests(self):
         new_user = {
@@ -76,7 +87,7 @@ class TestFlaskApi(unittest.TestCase):
         self.assertEqual(response_user, new_user)
 
     def test_post_new_user_requests_acceptation(self):
-        res = self.request("POST", '/newUserRequests/1/acceptation')
+        res = self.request("POST", '/newUserRequests/1/acceptation', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         new_user_request = res.body.get("new_user_request")
         self.assertTrue(new_user_request)
@@ -84,11 +95,11 @@ class TestFlaskApi(unittest.TestCase):
         self.assertEqual(new_user_request["state"], "accepted")
 
     def test_post_new_user_requests_acceptation_on_already_accepted_request(self):
-        res = self.request("POST", '/newUserRequests/2/acceptation')
+        res = self.request("POST", '/newUserRequests/2/acceptation', user=self.USERS["joel"])
         self.assertEqual(res.status, 400)
 
     def test_post_new_user_requests_rejection(self):
-        res = self.request("POST", 'newUserRequests/1/rejection')
+        res = self.request("POST", 'newUserRequests/1/rejection', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         r = res.body.get("new_user_request")
         self.assertTrue(r)
@@ -97,34 +108,49 @@ class TestFlaskApi(unittest.TestCase):
 
     # Users
 
-    def test_get_users(self):
-        res = self.request("GET", '/users')
+    def test_get_users_as_admin(self):
+        res = self.request("GET", '/users', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         self.assertEqual(len(res.body), 3)
 
+    def test_get_users_as_non_admin(self):
+        res = self.request("GET", '/users', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 401)
+
     def test_get_user(self):
-        res = self.request("GET", '/users/1')
+        res = self.request("GET", '/users/1', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
 
     def test_patch_user(self):
-        res = self.request("PATCH", '/users/1', {"email": "newemail1@mail.com"})
+        data = {"email": "newemail1@mail.com"}
+        res = self.request("PATCH", '/users/1', data=data, user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         self.assertEqual(res.body["email"], "newemail1@mail.com")
 
     def test_delete_user(self):
-        res = self.request('DELETE', '/users/1')
+        res = self.request('DELETE', '/users/2', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
 
-        res = self.request('GET', '/users/1')
+        res = self.request('GET', '/users/2', user=self.USERS["joel"])
         self.assertEqual(res.status, 404)
 
     # Messages
 
-    def test_get_user_messages(self):
-        res = self.request("GET", '/users/3/messages')
+    def test_get_user_messages_as_admin(self):
+        res = self.request("GET", '/users/3/messages', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         self.assertEqual(len(res.body), 2)
         self.assertTrue(all(message["toUser"]["id"] == 3 for message in res.body))
+
+    def test_get_user_messages_as_recipient(self):
+        res = self.request("GET", '/users/3/messages', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 200)
+        self.assertEqual(len(res.body), 2)
+        self.assertTrue(all(message["toUser"]["id"] == 3 for message in res.body))
+
+    def test_get_user_messages_as_normal_user_to_another_user(self):
+        res = self.request("GET", '/users/1/messages', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 401)
 
     def test_post_user_message(self):
         post_message = {"text": "Hello there!"}
@@ -138,13 +164,27 @@ class TestFlaskApi(unittest.TestCase):
     # Pricing
 
     def test_get_pricing(self):
-        res = self.request("GET", '/pricing')
+        res = self.request("GET", '/pricing', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
+
+    def test_patch_pricing(self):
+        post_pricing = {
+            "localMobile": 1.55,
+            "localLandLines": 0.85,
+        }
+        res = self.request("PATCH", '/pricing', data=post_pricing, user=self.USERS["joel"])
+        self.assertEqual(res.status, 200)
+        pricing = res.body
+        self.assertEqual(pricing["localMobile"], 1.55)
+        self.assertEqual(pricing["localLandLines"], 0.85)
+        self.assertEqual(pricing["nationalLandLines"], 2.1)
+        self.assertEqual(pricing["nationalMobile"], 2.3)
 
     # Call Pricing
 
     def test_get_call_pricing(self):
-        res = self.request("GET", '/callPricing/123-123-123')
+        res = self.request("GET", '/callPricing/123-123-123', user=self.USERS["joel"])
+        self.assertEqual(res.status, 200)
         pricing = res.body
         self.assertEqual(pricing["gsm"], 1.5)
         self.assertEqual(pricing["voip"], 0.01)
@@ -152,7 +192,7 @@ class TestFlaskApi(unittest.TestCase):
     # Vouchers
 
     def test_get_user_vouchers(self):
-        res = self.request("GET", '/users/3/vouchers')
+        res = self.request("GET", '/users/3/vouchers', user=self.USERS["marilyn"])
         self.assertEqual(res.status, 200)
         vouchers = res.body
         self.assertEqual(len(vouchers), 1)
@@ -160,14 +200,14 @@ class TestFlaskApi(unittest.TestCase):
 
     def test_post_user_voucher_with_code_of_inactive(self):
         post_voucher = {"code": "voucher3"}
-        res = self.request("POST", '/users/3/vouchers', post_voucher)
+        res = self.request("POST", '/users/3/vouchers', data=post_voucher, user=self.USERS["marilyn"])
         self.assertEqual(res.status, 200, "Body: {}".format(res.body))
         voucher = res.body
         self.assertEqual(voucher["user"].get("id"), 3)
 
     def test_post_user_voucher_with_code_of_already_active(self):
         post_voucher = {"code": "voucher1"}
-        res = self.request("POST", '/users/3/vouchers', post_voucher)
+        res = self.request("POST", '/users/3/vouchers', data=post_voucher, user=self.USERS["marilyn"])
         self.assertEqual(res.status, 404, "Body: {}".format(res.body))
 
 
