@@ -18,18 +18,20 @@ See the [example models](models.py) to see the available users and other resourc
 
 You can use `curl` with basic authentication (`-u user:password`, see `models.users`). 
 
-For example, to get the list of users:
+* Get the list of users:
 
 ```
 $ curl -u joel:joel1234 -sS http://localhost:5000/users -X GET
 {...}
 ```
 
-Or send a message to a user:
+* Send a message to a user:
 
+```
 $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
   -X POST -H "Content-Type: application/json" \
   -d '{"text": "Hello there"}'
+```
 
 # App actions
 
