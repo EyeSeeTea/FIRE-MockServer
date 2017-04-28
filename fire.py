@@ -46,8 +46,8 @@ def page_not_found(e):
 
 def admin_required(arg=None):
     def wrapper(f):
-        @auth.login_required
         @functools.wraps(f)
+        @auth.login_required
         def wrapped(*args, **kwargs):
             current_user = get_current_user()
             if current_user["admin"]:
@@ -149,6 +149,7 @@ class NewUserRequestAcceptation(Resource):
         new_user_request = models.new_user_requests[new_user_request_id]
         if new_user_request["state"] == "pending":
             new_user_request["state"] = "accepted"
+            new_user_request["adminUser"] = get_current_user()
             return jsonify(dict(new_user_request=new_user_request))
         else:
             abort(400, message="newUserRequest {} is not pending".format(new_user_request_id))
@@ -159,6 +160,7 @@ class NewUserRequestRejection(Resource):
         new_user_request = models.new_user_requests[new_user_request_id]
         if new_user_request["state"] == "pending":
             new_user_request["state"] = "rejected"
+            new_user_request["adminUser"] = get_current_user()
             return jsonify(dict(new_user_request=new_user_request))
         else:
             abort(400, message="newUserRequest {} is not pending".format(new_user_request_id))

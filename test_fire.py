@@ -14,8 +14,9 @@ class TestFireApi(unittest.TestCase):
     Response = collections.namedtuple("Response", ["status", "body"])
 
     USERS = {
-        "joel": {"username": "joel", "password": "joel1234"},
-        "marilyn": {"username": "marilyn", "password": "marilyn1234"},
+        "joel": {"id": 1, "username": "joel", "password": "joel1234"},
+        "maggie": {"id": 2, "username": "maggie", "password": "maggie1234"},
+        "marilyn": {"id": 3, "username": "marilyn", "password": "marilyn1234"},
     }
 
     def setUp(self):
@@ -91,20 +92,24 @@ class TestFireApi(unittest.TestCase):
         self.assertEqual(res.status, 200)
         new_user_request = res.body.get("new_user_request")
         self.assertTrue(new_user_request)
-        self.assertTrue(new_user_request["id"])
+        self.assertTrue(new_user_request.get("id"))
         self.assertEqual(new_user_request["state"], "accepted")
+        self.assertTrue(new_user_request.get("adminUser"))
+        self.assertEqual(new_user_request["adminUser"]["id"], self.USERS["joel"]["id"])
 
     def test_post_new_user_requests_acceptation_on_already_accepted_request(self):
         res = self.request("POST", '/newUserRequests/2/acceptation', user=self.USERS["joel"])
         self.assertEqual(res.status, 400)
 
     def test_post_new_user_requests_rejection(self):
-        res = self.request("POST", 'newUserRequests/1/rejection', user=self.USERS["joel"])
+        res = self.request("POST", '/newUserRequests/1/rejection', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
-        r = res.body.get("new_user_request")
-        self.assertTrue(r)
-        self.assertTrue(r["id"])
-        self.assertEqual(r["state"], "rejected")
+        new_user_request = res.body.get("new_user_request")
+        self.assertTrue(new_user_request)
+        self.assertTrue(new_user_request["id"])
+        self.assertEqual(new_user_request["state"], "rejected")
+        self.assertTrue(new_user_request.get("adminUser"))
+        self.assertEqual(new_user_request["adminUser"]["id"], self.USERS["joel"]["id"])
 
     # Users
 

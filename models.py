@@ -4,8 +4,11 @@ def user(user_id, private_fields=["password"]):
     user = users[user_id]
     return {k: v for (k, v) in user.items() if k not in private_fields}
 
-users = {
-    1: {
+def index_by_id(objs):
+    return {obj["id"]: obj for obj in objs}
+
+users = index_by_id([
+    {
         "id": 1,
         "name": "Joel Fleischman",
         "username": "joel",
@@ -21,7 +24,7 @@ users = {
         "serverHost": "http://pbx.com/provision",
         "password": "joel1234",
     },
-    2: {
+    {
         "id": 2,
         "name": "Maggie O'Connell",
         "username": "maggie",
@@ -37,7 +40,7 @@ users = {
         "serverHost": "http://pbx.com/provision",
         "password": "maggie1234",
     },
-    3: {
+    {
         "id": 3,
         "name": "Marilyn Whirlwind",
         "username": "marilyn",
@@ -53,10 +56,10 @@ users = {
         "serverHost": "http://pbx.com/provision",
         "password": "marilyn1234",
     },
-}
+])
 
-new_user_requests = {
-    1: {
+new_user_requests = index_by_id([
+    {
         "id": 1,
         "user": user(3),
         "created": datetime(2014, 1, 2),
@@ -64,35 +67,35 @@ new_user_requests = {
         "adminUser": None,
         "state": "pending",
     },
-    2: {
-        "id": 1,
+    {
+        "id": 2,
         "user": user(2),
         "created": datetime(2015, 1, 2),
         "updated": datetime(2015, 1, 2),
         "adminUser": user(1),
         "state": "accepted",
     },
-}
+])
 
-messages = {
-    1: {
+messages = index_by_id([
+    {
         "id": 1,
         "text": "Were you able to call?",
         "fromUser": user(1),
         "toUser": user(3),
         "created": datetime(2016, 7, 26, 22, 10),
     },
-    2: {
+    {
         "id": 2,
         "text": "Make sure you have credit before making a call",
         "fromUser": user(1),
         "toUser": user(3),
         "created": datetime(2016, 7, 26, 22, 50),
     },
-}
+])
 
-vouchers = {
-    1: {
+vouchers = index_by_id([
+    {
         "id": 1,
         "user": user(1),
         "state": "active",
@@ -106,7 +109,7 @@ vouchers = {
         "activated": datetime(2016, 7, 26, 23, 50),
         "depleted": None,
     },
-    2: {
+    {
         "id": 2,
         "user": user(3),
         "state": "depleted",
@@ -120,7 +123,7 @@ vouchers = {
         "activated": datetime(2016, 7, 26, 23, 50),
         "depleted": datetime(2016, 7, 29, 20, 50),
     },
-    3: {
+    {
         "id": 3,
         "user": None,
         "state": "inactive",
@@ -134,30 +137,35 @@ vouchers = {
         "activated": None,
         "depleted": None,
     },
-}
+])
 
-notifications = {
-    1: {
+notifications = index_by_id([
+    {
+        "id": 1,
         "type": "newUserAccepted",
         "newUserRequest": new_user_requests[2],
     },
-    2: {
+    {
+        "id": 2,
         "type": "newUserRequest",
         "newUserRequest": new_user_requests[1],
     },
-    3: {
+    {
+        "id": 3,
         "type": "messageSent",
         "message": messages[1],
     },
-    4: {
+    {
+        "id": 4,
         "type": "profileUpdated",
         "user": user(2),
     },
-    5: {
+    {
+        "id": 5,
         "type": "toppedUp",
         "voucher": vouchers[1],
     },
-}
+])
 
 pricing = {
     "localMobile": 1.5,
