@@ -20,9 +20,19 @@ You can use `curl` with basic authentication (`-u user:password`, see `models.us
 
 * Get the list of users:
 
+Example with curl:
+
 ```
 $ curl -u joel:joel1234 -sS http://localhost:5000/users -X GET
 {...}
+```
+
+Example from AngularJS:
+
+```
+const url = "http://dev.eyeseetea.com:5000/users/3";
+const headers = {'Authorization': 'Basic ' + btoa("joel:joel1234")};
+http.get(url, {headers}).subscribe(response => console.log(response.json()));
 ```
 
 * Send a message to a user:
