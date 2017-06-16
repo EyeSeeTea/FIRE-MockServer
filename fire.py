@@ -4,7 +4,8 @@ import functools
 
 from flask import Flask, jsonify, make_response, request
 from flask_restful import Resource, Api, abort, reqparse
-from flask_httpauth import HTTPBasicAuth    
+from flask_httpauth import HTTPBasicAuth
+from flask_cors import CORS, cross_origin
 
 import models
 
@@ -37,6 +38,7 @@ def admin_or_user(user_id):
 # Init flask app
 
 app = Flask(__name__)
+CORS(app)
 api = Api(app)
 app.config['ERROR_404_HELP'] = False
 
