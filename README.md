@@ -7,9 +7,9 @@ Mock server for FIRE.
 ```
 $ git clone git@github.com:EyeSeeTea/FIRE-MockServer.git
 $ cd FIRE-MockServer
-$ virtualenv -p /path/to/your/system/python3 env
-$ env/bin/pip install -r requirements.txt
-$ FLASK_APP=fire.py FLASK_DEBUG=1 .env/bin/flask run --host=127.0.0.1
+$ virtualenv -p $(which python3) env
+$ ./env/bin/pip install -r requirements.txt
+$ FLASK_APP=fire.py FLASK_DEBUG=1 ./env/bin/flask run --host=127.0.0.1
 ```
 
 # Example of usage 
