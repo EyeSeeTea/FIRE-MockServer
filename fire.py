@@ -2,12 +2,24 @@
 from datetime import datetime
 import functools
 
-from flask import Flask, jsonify, make_response, request
-from flask_restful import Resource, Api, abort, reqparse
+from flask import Flask, jsonify, make_response, request, abort
+from flask_restful import Resource, Api
 from flask_httpauth import HTTPBasicAuth
 from flask_cors import CORS, cross_origin
 
 import models
+
+# JSON Responses
+
+def success(data=None):
+    json = dict(status="success", data=data)
+    return jsonify(dict((k, v) for (k, v) in json.items() if v is not None))
+
+def error(status_code, message):
+    return make_response(jsonify(dict(status="error", message=message)), status_code)
+
+def abort_with_error(status_code, message):
+    abort(error(status_code, message))
 
 # Auth
 
@@ -21,15 +33,15 @@ def get_password(username):
 
 @auth.error_handler
 def unauthorized():
-    return make_response(jsonify({'error': 'Unauthorized access'}), 401)
+    return error(401, "Unauthorized access")
 
 def get_current_user():
     auth_username = auth.username()
     user = first(user for user in models.users.values() if user["username"] == auth_username)
-    if user:
-        return user
+    if not user:
+        abort_with_error(500, "Cannot get current user")
     else:
-        abort(500, "Cannot get current user")
+        return user
 
 def admin_or_user(user_id):
     current_user = get_current_user()
@@ -43,8 +55,8 @@ api = Api(app)
 app.config['ERROR_404_HELP'] = False
 
 @app.errorhandler(404)
-def page_not_found(e):
-    return jsonify(error=404, text="The requested URL was not found on the server"), 404
+def page_not_found(exception):
+    return error(404, "The requested URL was not found on the server")
 
 def admin_required(arg=None):
     def wrapper(f):
@@ -71,7 +83,7 @@ def merge(d1, d2):
 
 def get_user(users, user_id):
     if user_id not in models.users:
-        abort(404, message="User with id {} doesn't exist".format(user_id))
+        abort_with_error(404, "User with id {} doesn't exist".format(user_id))
     else:
         return models.users[user_id]
 
@@ -80,7 +92,7 @@ def get_user(users, user_id):
 class NewUserRequestList(Resource):
     @admin_required
     def get(self):
-        return jsonify(list(models.new_user_requests.values()))
+        return success(list(models.new_user_requests.values()))
 
     def post(self):
         new_user = request.get_json().get("user")
@@ -90,11 +102,11 @@ class NewUserRequestList(Resource):
             for req in models.new_user_requests.values() if req["state"] == "pending")
 
         if not username:
-            abort(400, message="Missing field: username")
+            return error(400, "Missing field: username")
         if username in existing_usernames:
-            abort(400, message="User {} already exist".format(username))
+            return error(400, "User {} already exist".format(username))
         elif username in pending_requested_usernames:
-            abort(400, message="There is a request for user {} already pending".format(username))
+            return error(400, "There is a request for user {} already pending".format(username))
         else:
             new_id = models.get_next_id(models.new_user_requests)
             new_user_request = {
@@ -106,18 +118,18 @@ class NewUserRequestList(Resource):
                 "state": "pending",
             }
             models.new_user_requests[new_id] = new_user_request
-            return jsonify(new_user_request)
+            return success(new_user_request)
 
 class CurrentUser(Resource):
     @auth.login_required
     def get(self):
         current_user = get_current_user()
-        return jsonify(models.get_public_user(current_user))
+        return success(models.get_public_user(current_user))
 
 class UserList(Resource):
     @admin_required
     def get(self):
-        return jsonify([models.get_public_user(user) for user in models.users.values()])
+        return success([models.get_public_user(user) for user in models.users.values()])
 
 class User(Resource):
     @auth.login_required
@@ -125,13 +137,13 @@ class User(Resource):
         if not admin_or_user(user_id):
             return unauthorized()
         user = get_user(models.users, user_id)
-        return jsonify(models.get_public_user(models.users[user_id]))
+        return success(models.get_public_user(models.users[user_id]))
 
     @admin_required
     def delete(self, user_id):
         user = get_user(models.users, user_id)
         del models.users[user_id]
-        return jsonify({})
+        return success()
 
     @admin_required
     def patch(self, user_id):
@@ -140,12 +152,12 @@ class User(Resource):
         request_user = request.get_json()
         new_user = dict(existing_user, **request_user)
         models.users[user_id] = new_user
-        return jsonify(new_user)
+        return success(new_user)
 
 class NotificationList(Resource):
     @admin_required
     def get(self):
-        return jsonify(list(models.notifications.values()))
+        return success(list(models.notifications.values()))
 
 class NewUserRequestAcceptation(Resource):
     @admin_required
@@ -159,9 +171,9 @@ class NewUserRequestAcceptation(Resource):
             new_user["id"] = new_user_id
             new_user["state"] = "active"
             models.users[new_user_id] = new_user
-            return jsonify(dict(new_user_request=new_user_request))
+            return success(new_user_request)
         else:
-            abort(400, message="newUserRequest {} already accepted".format(new_user_request_id))
+            return error(400, "newUserRequest {} already accepted".format(new_user_request_id))
 
 class NewUserRequestRejection(Resource):
     @admin_required
@@ -172,9 +184,9 @@ class NewUserRequestRejection(Resource):
             new_user_request["adminUser"] = get_current_user()
             new_user_id = new_user_request["user"].get("id")
             models.users.pop(new_user_id, None)
-            return jsonify(dict(new_user_request=new_user_request))
+            return success(new_user_request)
         else:
-            abort(400, message="newUserRequest {} already rejected".format(new_user_request_id))
+            return error(400, "newUserRequest {} already rejected".format(new_user_request_id))
 
 class MessageList(Resource):
     @auth.login_required
@@ -183,7 +195,7 @@ class MessageList(Resource):
             return unauthorized()
         user = get_user(models.users, user_id)
         user_messages = [m for m in models.messages.values() if m["toUser"]["id"] == user_id]
-        return jsonify(user_messages)
+        return success(user_messages)
 
     @admin_required
     def post(self, user_id):
@@ -198,12 +210,12 @@ class MessageList(Resource):
             "created": datetime.now()
         })
         models.messages[new_message_id] = new_message
-        return jsonify(new_message)
+        return success(new_message)
 
 class CallPricing(Resource):
     @auth.login_required
     def get(self, number):
-        return models.call_pricing
+        return success(models.call_pricing)
 
 class UserVoucherList(Resource):
     @auth.login_required
@@ -211,9 +223,9 @@ class UserVoucherList(Resource):
         if not admin_or_user(user_id):
             return unauthorized()
         user = get_user(models.users, user_id)
-        user_vouchers = [v for v in models.vouchers.values() 
+        user_vouchers = [v for v in models.vouchers.values()
             if v["user"] and v["user"]["id"] == user["id"]]
-        return jsonify(user_vouchers)
+        return success(user_vouchers)
 
     @auth.login_required
     def post(self, user_id):
@@ -221,10 +233,10 @@ class UserVoucherList(Resource):
             return unauthorized()
         user = get_user(models.users, user_id)
         code = request.get_json()["code"]
-        voucher = first(v for v in models.vouchers.values() 
+        voucher = first(v for v in models.vouchers.values()
                 if v["code"] == code and v["state"] == "inactive")
         if not voucher:
-            abort(404, message="Voucher with code {} not found".format(code))
+            return error(404, "Voucher with code {} not found".format(code))
         else:
             activated_voucher = merge(voucher, {
                 "state": "active",
@@ -232,7 +244,7 @@ class UserVoucherList(Resource):
                 "user": models.get_public_user(user),
             })
             models.vouchers[voucher["id"]] = activated_voucher
-            return jsonify(activated_voucher)
+            return success(activated_voucher)
 
 class Pricing(Resource):
     @admin_required
@@ -243,7 +255,7 @@ class Pricing(Resource):
     def patch(self):
         new_pricing = request.get_json()
         models.pricing.update(new_pricing)
-        return jsonify(models.pricing)
+        return success(models.pricing)
 
 # Routes
 
