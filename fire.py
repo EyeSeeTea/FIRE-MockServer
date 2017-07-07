@@ -72,7 +72,7 @@ def merge(d1, d2):
 def get_next_id(resources):
     return (max(resource["id"] for resource in resources.values()) + 1 if resources else 1)
 
-def get_public_user(user, private_fields=["password"]):
+def get_public_user(user, private_fields=["password", "state"]):
     return {k: v for (k, v) in user.items() if k not in private_fields}
 
 def get_user(users, user_id):
@@ -114,14 +114,22 @@ class NewUserRequestList(Resource):
             models.new_user_requests[new_id] = new_user_request
             return jsonify(new_user_request)
 
+class CurrentUser(Resource):
+    @auth.login_required
+    def get(self):
+        current_user = get_current_user()
+        return jsonify(get_public_user(current_user))
+
 class UserList(Resource):
     @admin_required
     def get(self):
         return jsonify([get_public_user(user) for user in models.users.values()])
 
 class User(Resource):
-    @admin_required
+    @auth.login_required
     def get(self, user_id):
+        if not admin_or_user(user_id):
+            return unauthorized()
         user = get_user(models.users, user_id)
         return jsonify(get_public_user(models.users[user_id]))
 
@@ -252,6 +260,7 @@ api.add_resource(NewUserRequestRejection, '/newUserRequests/<int:new_user_reques
 
 ### Users
 
+api.add_resource(CurrentUser, '/currentUser')
 api.add_resource(UserList, '/users')
 api.add_resource(User, '/users/<int:user_id>')
 api.add_resource(MessageList, '/users/<int:user_id>/messages')

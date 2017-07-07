@@ -113,18 +113,40 @@ class TestFireApi(unittest.TestCase):
 
     # Users
 
-    def test_get_users_as_admin(self):
+    def test_get_current_user_succeeds(self):
+        res = self.request("GET", '/currentUser', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 200)
+        users = res.body
+        self.assertEqual(users["username"], "marilyn")
+
+    def test_get_current_user_without_auth_is_not_authorized(self):
+        res = self.request("GET", '/currentUser')
+        self.assertEqual(res.status, 401)
+
+    def test_get_users_as_admin_succeeds(self):
         res = self.request("GET", '/users', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         self.assertEqual(len(res.body), 3)
 
-    def test_get_users_as_non_admin(self):
+    def test_get_users_as_non_admin_is_not_authorized(self):
         res = self.request("GET", '/users', user=self.USERS["marilyn"])
         self.assertEqual(res.status, 401)
 
-    def test_get_user(self):
+    def test_get_own_user_as_admin_succeeds(self):
         res = self.request("GET", '/users/1', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
+
+    def test_get_other_user_as_admin_succeeds(self):
+        res = self.request("GET", '/users/2', user=self.USERS["joel"])
+        self.assertEqual(res.status, 200)
+
+    def test_get_own_user_as_user_succeeds(self):
+        res = self.request("GET", '/users/3', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 200)
+
+    def test_get_other_user_as_user_is_not_authorized(self):
+        res = self.request("GET", '/users/1', user=self.USERS["marilyn"])
+        self.assertEqual(res.status, 401)
 
     def test_patch_user(self):
         data = {"email": "newemail1@mail.com"}

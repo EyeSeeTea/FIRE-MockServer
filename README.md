@@ -60,6 +60,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 
 ### Users
 
+- GET /currentUser -> [User]
 - GET /users -> [User]
 - GET /users/{id} -> User
 - PATCH /users/{id} User -> STATUS
