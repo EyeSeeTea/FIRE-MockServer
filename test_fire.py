@@ -87,7 +87,7 @@ class TestFireApi(unittest.TestCase):
         response_user = {k: v for (k, v) in new_user_request["user"].items() if k in new_user}
         self.assertEqual(response_user, new_user)
 
-    def test_post_new_user_requests_acceptation(self):
+    def test_post_new_user_request_acceptation_activates_user(self):
         res = self.request("POST", '/newUserRequests/1/acceptation', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         new_user_request = res.body.get("new_user_request")
@@ -96,12 +96,18 @@ class TestFireApi(unittest.TestCase):
         self.assertEqual(new_user_request["state"], "accepted")
         self.assertTrue(new_user_request.get("adminUser"))
         self.assertEqual(new_user_request["adminUser"]["id"], self.USERS["joel"]["id"])
+        self.assertTrue(new_user_request.get("user"))
+        accepted_user = new_user_request.get("user")
+        self.assertTrue(accepted_user.get("id"))
 
-    def test_post_new_user_requests_acceptation_on_already_accepted_request(self):
+        res = self.request("GET", '/users/%d' % accepted_user["id"], user=accepted_user)
+        self.assertEqual(res.status, 200)
+
+    def test_post_new_user_requests_acceptation_on_already_accepted_request_fails(self):
         res = self.request("POST", '/newUserRequests/2/acceptation', user=self.USERS["joel"])
         self.assertEqual(res.status, 400)
 
-    def test_post_new_user_requests_rejection(self):
+    def test_post_new_user_requests_rejection_rejects_the_user(self):
         res = self.request("POST", '/newUserRequests/1/rejection', user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         new_user_request = res.body.get("new_user_request")
@@ -110,6 +116,7 @@ class TestFireApi(unittest.TestCase):
         self.assertEqual(new_user_request["state"], "rejected")
         self.assertTrue(new_user_request.get("adminUser"))
         self.assertEqual(new_user_request["adminUser"]["id"], self.USERS["joel"]["id"])
+        self.assertTrue(new_user_request.get("user"))
 
     # Users
 
