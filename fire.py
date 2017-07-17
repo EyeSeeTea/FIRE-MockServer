@@ -69,12 +69,6 @@ def merge(d1, d2):
     d3.update(d2)
     return d3
 
-def get_next_id(resources):
-    return (max(resource["id"] for resource in resources.values()) + 1 if resources else 1)
-
-def get_public_user(user, private_fields=["password"]):
-    return {k: v for (k, v) in user.items() if k not in private_fields}
-
 def get_user(users, user_id):
     if user_id not in models.users:
         abort(404, message="User with id {} doesn't exist".format(user_id))
@@ -102,10 +96,10 @@ class NewUserRequestList(Resource):
         elif username in pending_requested_usernames:
             abort(400, message="There is a request for user {} already pending".format(username))
         else:
-            new_id = get_next_id(models.new_user_requests)
+            new_id = models.get_next_id(models.new_user_requests)
             new_user_request = {
                 "id": new_id,
-                "user": new_user,
+                "user": models.get_public_user(new_user),
                 "created": datetime.now(),
                 "updated": datetime.now(),
                 "adminUser": None,
@@ -114,16 +108,24 @@ class NewUserRequestList(Resource):
             models.new_user_requests[new_id] = new_user_request
             return jsonify(new_user_request)
 
+class CurrentUser(Resource):
+    @auth.login_required
+    def get(self):
+        current_user = get_current_user()
+        return jsonify(models.get_public_user(current_user))
+
 class UserList(Resource):
     @admin_required
     def get(self):
-        return jsonify([get_public_user(user) for user in models.users.values()])
+        return jsonify([models.get_public_user(user) for user in models.users.values()])
 
 class User(Resource):
-    @admin_required
+    @auth.login_required
     def get(self, user_id):
+        if not admin_or_user(user_id):
+            return unauthorized()
         user = get_user(models.users, user_id)
-        return jsonify(get_public_user(models.users[user_id]))
+        return jsonify(models.get_public_user(models.users[user_id]))
 
     @admin_required
     def delete(self, user_id):
@@ -149,23 +151,30 @@ class NewUserRequestAcceptation(Resource):
     @admin_required
     def post(self, new_user_request_id):
         new_user_request = models.new_user_requests[new_user_request_id]
-        if new_user_request["state"] == "pending":
+        if new_user_request["state"] != "accepted":
             new_user_request["state"] = "accepted"
             new_user_request["adminUser"] = get_current_user()
+            new_user = new_user_request["user"]
+            new_user_id = new_user.get("id", models.get_next_id(models.users))
+            new_user["id"] = new_user_id
+            new_user["state"] = "active"
+            models.users[new_user_id] = new_user
             return jsonify(dict(new_user_request=new_user_request))
         else:
-            abort(400, message="newUserRequest {} is not pending".format(new_user_request_id))
+            abort(400, message="newUserRequest {} already accepted".format(new_user_request_id))
 
 class NewUserRequestRejection(Resource):
     @admin_required
     def post(self, new_user_request_id):
         new_user_request = models.new_user_requests[new_user_request_id]
-        if new_user_request["state"] == "pending":
+        if new_user_request["state"] != "rejected":
             new_user_request["state"] = "rejected"
             new_user_request["adminUser"] = get_current_user()
+            new_user_id = new_user_request["user"].get("id")
+            models.users.pop(new_user_id, None)
             return jsonify(dict(new_user_request=new_user_request))
         else:
-            abort(400, message="newUserRequest {} is not pending".format(new_user_request_id))
+            abort(400, message="newUserRequest {} already rejected".format(new_user_request_id))
 
 class MessageList(Resource):
     @auth.login_required
@@ -180,7 +189,7 @@ class MessageList(Resource):
     def post(self, user_id):
         user = get_user(models.users, user_id)
         new_message_base = request.get_json()
-        new_message_id = get_next_id(models.messages)
+        new_message_id = models.get_next_id(models.messages)
 
         new_message = merge(new_message_base, {
             "id": new_message_id,
@@ -220,7 +229,7 @@ class UserVoucherList(Resource):
             activated_voucher = merge(voucher, {
                 "state": "active",
                 "activated": datetime.now(),
-                "user": user,
+                "user": models.get_public_user(user),
             })
             models.vouchers[voucher["id"]] = activated_voucher
             return jsonify(activated_voucher)
@@ -252,6 +261,7 @@ api.add_resource(NewUserRequestRejection, '/newUserRequests/<int:new_user_reques
 
 ### Users
 
+api.add_resource(CurrentUser, '/currentUser')
 api.add_resource(UserList, '/users')
 api.add_resource(User, '/users/<int:user_id>')
 api.add_resource(MessageList, '/users/<int:user_id>/messages')
