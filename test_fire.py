@@ -49,7 +49,7 @@ class TestFireApi(unittest.TestCase):
         self.assertTrue(res.body.get("data"))
 
     def test_not_found(self):
-        res = self.request("GET", '/thisEndPointThoseNotExist')
+        res = self.request("GET", '/thisEndPointDoesNotExist')
         self.assertEqual(res.status, 404)
         self.assertEqual(res.body.get("status"), "error")
         self.assertEqual(res.body.get("message"), "The requested URL was not found on the server")
