@@ -12,11 +12,11 @@ $ ./env/bin/pip install -r requirements.txt
 $ FLASK_APP=fire.py FLASK_DEBUG=1 ./env/bin/flask run --host=127.0.0.1
 ```
 
-# Example of usage 
+# Example of usage
 
 See the [example models](models.py) to see the available users and other resources.
 
-You can use `curl` with basic authentication (`-u user:password`, see `models.users`). 
+You can use `curl` with basic authentication (`-u user:password`, see `models.users`).
 
 * Get the list of users:
 
@@ -24,7 +24,12 @@ Example with curl:
 
 ```
 $ curl -u joel:joel1234 -sS http://localhost:5000/users -X GET
-{...}
+{status: "success", data: ...}
+```
+
+```
+$ curl -u marilyn:marilyn1234 -sS http://localhost:5000/users/1 -X GET
+{status: "error", message: "Unauthorized access"}
 ```
 
 Example from AngularJS:
@@ -166,7 +171,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 - localLandLines: Number
 - nationalMobile: Number
 - nationalLandLines: Number
-- international (List): 
+- international (List):
   - country: String
   - mobile: Number
   - landLines: Number
