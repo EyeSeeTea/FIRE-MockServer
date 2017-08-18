@@ -212,7 +212,7 @@ class TestFireApi(unittest.TestCase):
 
     def test_post_user_single_message(self):
         post_message = {"text": "Hello there!"}
-        res = self.request("POST", '/users/3/messages', data=post_message, user=self.USERS["joel"])
+        res = self.request("POST", '/users/3/message', data=post_message, user=self.USERS["joel"])
         self.assertEqual(res.status, 200)
         messages = res.body["data"]
         self.assertEqual(len(messages), 1)
@@ -223,7 +223,7 @@ class TestFireApi(unittest.TestCase):
 
     def test_post_user_multiple_messages(self):
         post_message = {"text": "Hello there!"}
-        res = self.request("POST", '/users/2,3/messages', data=post_message, user=self.USERS["joel"])
+        res = self.request("POST", '/users/2,3/message', data=post_message, user=self.USERS["joel"])
         messages = res.body["data"]
         self.assertEqual(res.status, 200)
         self.assertEqual(len(messages), 2)

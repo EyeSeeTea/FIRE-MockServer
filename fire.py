@@ -294,7 +294,7 @@ api.add_resource(User, '/users/<int:user_id>')
 ### Messages
 
 api.add_resource(MessageList, '/users/<int:user_id>/messages')
-api.add_resource(MessageListBulk, '/users/<int_list:user_ids>/messages')
+api.add_resource(MessageListBulk, '/users/<int_list:user_ids>/message')
 
 ### Billing
 
