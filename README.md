@@ -116,6 +116,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 - name: String
 - username: String
 - address: String
+- admin: Bool
 - avatarUrl: String
 - email: String
 - gender: String ("male" | "female")
