@@ -57,7 +57,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 
 ## Pre-login
 
-- POST /newUserRequests : NewUserRequest -> STATUS
+- POST /newUserRequests : {user: User} -> STATUS
 
 ## Admin
 
