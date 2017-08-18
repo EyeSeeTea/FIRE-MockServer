@@ -210,14 +210,33 @@ class TestFireApi(unittest.TestCase):
         res = self.request("GET", '/users/1/messages', user=self.USERS["marilyn"])
         self.assertEqual(res.status, 401)
 
-    def test_post_user_message(self):
+    def test_post_user_single_message(self):
         post_message = {"text": "Hello there!"}
         res = self.request("POST", '/users/3/messages', data=post_message, user=self.USERS["joel"])
-        message = res.body["data"]
         self.assertEqual(res.status, 200)
+        messages = res.body["data"]
+        self.assertEqual(len(messages), 1)
+        message = messages[0]
         self.assertEqual(message["text"], "Hello there!")
         self.assertEqual(message["fromUser"].get("id"), 1)
         self.assertEqual(message["toUser"].get("id"), 3)
+
+    def test_post_user_multiple_messages(self):
+        post_message = {"text": "Hello there!"}
+        res = self.request("POST", '/users/2,3/messages', data=post_message, user=self.USERS["joel"])
+        messages = res.body["data"]
+        self.assertEqual(res.status, 200)
+        self.assertEqual(len(messages), 2)
+
+        message1 = messages[0]
+        self.assertEqual(message1["text"], "Hello there!")
+        self.assertEqual(message1["fromUser"].get("id"), 1)
+        self.assertEqual(message1["toUser"].get("id"), 2)
+
+        message2 = messages[1]
+        self.assertEqual(message2["text"], "Hello there!")
+        self.assertEqual(message2["fromUser"].get("id"), 1)
+        self.assertEqual(message2["toUser"].get("id"), 3)
 
     # Pricing
 
