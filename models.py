@@ -7,6 +7,15 @@ def user(user_id, private_fields=["password"]):
 def index_by_id(objs):
     return {obj["id"]: obj for obj in objs}
 
+def get_next_id(resources):
+    return (max(resource["id"] for resource in resources.values()) + 1 if resources else 1)
+
+def get_public_user(user, private_fields=["password"]):
+    return {k: v for (k, v) in user.items() if k not in private_fields}
+
+def public_user(user_id):
+    return get_public_user(user(user_id))
+
 users = index_by_id([
     {
         "id": 1,
@@ -61,7 +70,19 @@ users = index_by_id([
 new_user_requests = index_by_id([
     {
         "id": 1,
-        "user": user(3),
+        "user": {
+            "name": "Chris Stevens",
+            "username": "chris",
+            "address": "KBHR 570, Alaska",
+            "admin": False,
+            "gender": "male",
+            "avatarUrl" : "https://s-media-cache-ak0.pinimg.com/originals/95/0f/80/950f80784424912493374c60c6530a16.jpg",
+            "email": "chris.stevens@mail.com",
+            "phoneNumber": "123-123-004",
+            "created": datetime(2014, 1, 6),
+            "serverHost": "http://pbx.com/provision",
+            "password": "chris1234",
+        },
         "created": datetime(2014, 1, 2),
         "updated": datetime(2014, 1, 2),
         "adminUser": None,
@@ -69,7 +90,7 @@ new_user_requests = index_by_id([
     },
     {
         "id": 2,
-        "user": user(2),
+        "user": public_user(2),
         "created": datetime(2015, 1, 2),
         "updated": datetime(2015, 1, 2),
         "adminUser": user(1),
@@ -81,15 +102,15 @@ messages = index_by_id([
     {
         "id": 1,
         "text": "Were you able to call?",
-        "fromUser": user(1),
-        "toUser": user(3),
+        "fromUser": public_user(1),
+        "toUser": public_user(3),
         "created": datetime(2016, 7, 26, 22, 10),
     },
     {
         "id": 2,
         "text": "Make sure you have credit before making a call",
-        "fromUser": user(1),
-        "toUser": user(3),
+        "fromUser": public_user(1),
+        "toUser": public_user(3),
         "created": datetime(2016, 7, 26, 22, 50),
     },
 ])
@@ -97,7 +118,7 @@ messages = index_by_id([
 vouchers = index_by_id([
     {
         "id": 1,
-        "user": user(1),
+        "user": public_user(1),
         "state": "active",
         "creditRemaining": 40,
         "creditTotal": 50,
@@ -111,7 +132,7 @@ vouchers = index_by_id([
     },
     {
         "id": 2,
-        "user": user(3),
+        "user": public_user(3),
         "state": "depleted",
         "creditRemaining": 0,
         "creditTotal": 80,
@@ -158,7 +179,7 @@ notifications = index_by_id([
     {
         "id": 4,
         "type": "profileUpdated",
-        "user": user(2),
+        "user": public_user(2),
     },
     {
         "id": 5,

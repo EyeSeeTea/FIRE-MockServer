@@ -7,16 +7,16 @@ Mock server for FIRE.
 ```
 $ git clone git@github.com:EyeSeeTea/FIRE-MockServer.git
 $ cd FIRE-MockServer
-$ virtualenv -p /path/to/your/system/python3 env
-$ env/bin/pip install -r requirements.txt
-$ FLASK_APP=fire.py FLASK_DEBUG=1 .env/bin/flask run --host=127.0.0.1
+$ virtualenv -p $(which python3) env
+$ ./env/bin/pip install -r requirements.txt
+$ FLASK_APP=fire.py FLASK_DEBUG=1 ./env/bin/flask run --host=127.0.0.1
 ```
 
-# Example of usage 
+# Example of usage
 
 See the [example models](models.py) to see the available users and other resources.
 
-You can use `curl` with basic authentication (`-u user:password`, see `models.users`). 
+You can use `curl` with basic authentication (`-u user:password`, see `models.users`).
 
 * Get the list of users:
 
@@ -24,15 +24,25 @@ Example with curl:
 
 ```
 $ curl -u joel:joel1234 -sS http://localhost:5000/users -X GET
-{...}
+{status: "success", data: ...}
+```
+
+```
+$ curl -u marilyn:marilyn1234 -sS http://localhost:5000/users/1 -X GET
+{status: "error", message: "Unauthorized access"}
 ```
 
 Example from AngularJS:
 
 ```
+import { Http, Response, Headers } from '@angular/http'
+
+...
+
 const url = "http://dev.eyeseetea.com:5000/users/3";
-const headers = {'Authorization': 'Basic ' + btoa("joel:joel1234")};
-http.get(url, {headers}).subscribe(response => console.log(response.json()));
+let headers = new Headers();
+headers.append('Authorization', 'Basic ' + btoa('joel:joel1234'));
+http.get(url, {headers: headers}).subscribe(response => console.log(response.json()));
 ```
 
 * Send a message to a user:
@@ -47,7 +57,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 
 ## Pre-login
 
-- POST /newUserRequests : NewUserRequest -> STATUS
+- POST /newUserRequests : {user: User} -> STATUS
 
 ## Admin
 
@@ -60,13 +70,14 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 
 ### Users
 
+- GET /currentUser -> [User]
 - GET /users -> [User]
 - GET /users/{id} -> User
 - PATCH /users/{id} User -> STATUS
 - DELETE /users/{id} -> STATUS
 
 - GET /users/{id}/messages -> [Message]
-- POST /users/{id}/messages : Message -> STATUS
+- POST /users/{id1},{id2},{id3},.../message : Message -> STATUS
 
 ### Billing
 
@@ -105,6 +116,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 - name: String
 - username: String
 - address: String
+- admin: Bool
 - avatarUrl: String
 - email: String
 - gender: String ("male" | "female")
@@ -160,7 +172,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 - localLandLines: Number
 - nationalMobile: Number
 - nationalLandLines: Number
-- international (List): 
+- international (List):
   - country: String
   - mobile: Number
   - landLines: Number
