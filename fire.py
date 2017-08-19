@@ -1,13 +1,22 @@
 #!/usr/bin/env python
 from datetime import datetime
 import functools
+import re
 
 from flask import Flask, jsonify, make_response, request, abort
 from flask_restful import Resource, Api
 from flask_httpauth import HTTPBasicAuth
 from flask_cors import CORS, cross_origin
+from werkzeug.routing import BaseConverter
 
 import models
+
+class IntListConverter(BaseConverter):
+    def to_python(self, value):
+        return [int(x) for x in re.findall(r"\d+", value)]
+
+    def to_url(self, value):
+        return ','.join(str(x) for x in value)
 
 # JSON Responses
 
@@ -53,6 +62,7 @@ app = Flask(__name__)
 CORS(app)
 api = Api(app)
 app.config['ERROR_404_HELP'] = False
+app.url_map.converters['int_list'] = IntListConverter
 
 @app.errorhandler(404)
 def page_not_found(exception):
@@ -197,20 +207,24 @@ class MessageList(Resource):
         user_messages = [m for m in models.messages.values() if m["toUser"]["id"] == user_id]
         return success(user_messages)
 
+class MessageListBulk(Resource):
     @admin_required
-    def post(self, user_id):
-        user = get_user(models.users, user_id)
-        new_message_base = request.get_json()
-        new_message_id = models.get_next_id(models.messages)
+    def post(self, user_ids):
+        messages = []
+        message_base = request.get_json()
+        for user_id in user_ids:
+            user = get_user(models.users, user_id)
+            message_id = models.get_next_id(models.messages)
 
-        new_message = merge(new_message_base, {
-            "id": new_message_id,
-            "fromUser": get_current_user(),
-            "toUser": user,
-            "created": datetime.now()
-        })
-        models.messages[new_message_id] = new_message
-        return success(new_message)
+            message = merge(message_base, {
+                "id": message_id,
+                "fromUser": get_current_user(),
+                "toUser": user,
+                "created": datetime.now()
+            })
+            models.messages[message_id] = message
+            messages.append(message)
+        return success(messages)
 
 class CallPricing(Resource):
     @auth.login_required
@@ -276,7 +290,11 @@ api.add_resource(NewUserRequestRejection, '/newUserRequests/<int:new_user_reques
 api.add_resource(CurrentUser, '/currentUser')
 api.add_resource(UserList, '/users')
 api.add_resource(User, '/users/<int:user_id>')
+
+### Messages
+
 api.add_resource(MessageList, '/users/<int:user_id>/messages')
+api.add_resource(MessageListBulk, '/users/<int_list:user_ids>/message')
 
 ### Billing
 

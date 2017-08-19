@@ -77,7 +77,7 @@ $ curl -u joel:joel1234 -sS http://localhost:5000/users/3/messages \
 - DELETE /users/{id} -> STATUS
 
 - GET /users/{id}/messages -> [Message]
-- POST /users/{id}/messages : Message -> STATUS
+- POST /users/{id1},{id2},{id3},.../message : Message -> STATUS
 
 ### Billing
 
